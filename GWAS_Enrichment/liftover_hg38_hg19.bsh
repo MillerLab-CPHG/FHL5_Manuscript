@@ -1,0 +1,23 @@
+liftover_hg38_hg19.## liftover--hg38--hg19
+
+ucsc_dir=/scratch/dw2vr/ucsc_tools
+outdir=/scratch/dw2vr/gregor_enrich/gregor_final_enrich/hg19
+indir=/scratch/dw2vr/gregor_enrich/gregor_final_enrich/hg38
+
+
+for file in `ls $indir` 
+
+do
+
+echo $file
+
+awk -vOFS="\t" '{print $1, $2, $3, $4}' ${file} > $indir/${file}_less
+
+$ucsc_dir/liftOver $indir/${file}_less $ucsc_dir/hg38ToHg19.over.chain.gz $outdir/${file}_hg19 $outdir/unMapped
+
+rm $indir/${file}_less
+
+rm $outdir/unMapped
+
+done
+bsh
