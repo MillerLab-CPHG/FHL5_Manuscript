@@ -1,0 +1,41 @@
+dir=/scratch/dw2vr/GREGOR_enrich_Final/GWAS_hg19
+dir2=/scratch/dw2vr/GREGOR_enrich_Final/gregor_in
+
+
+for trait in `cat $dir/list_sugg_snps`
+do 
+
+echo $trait 
+
+mkdir ${dir2}/${trait}
+
+for chr in {1..22} ; do 
+
+plink \
+--extract ${dir}/${trait} \
+--bfile /scratch/dw2vr/vcf_files/EUR_pop/plink_files/EUR_chr$chr \
+--indep-pairwise  50 5 0.2 \
+--out ${dir2}/${trait}/${trait}_chr${chr}_snps
+
+done 
+
+done 
+
+## clean up dir2
+
+for trait in `cat $dir/list_sugg_snps`
+do 
+
+echo $trait 
+
+cat ${dir2}/${trait}/${trait}_chr*_snps.prune.in | grep rs > ${dir2}/${trait}_ALL_pruned_in
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.log
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.prune.out
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.nosex
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.prune.in
+
+done 

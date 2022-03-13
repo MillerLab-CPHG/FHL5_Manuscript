@@ -1,0 +1,148 @@
+Gregor_FINAL.bsh
+
+
+module load plink 
+module load perl 
+
+dir=/scratch/dw2vr/GREGOR_enrich_Final/GWAS_hg19
+
+cut -f26 $dir/1000G_CAC_EA_AA_sig_5E-5_loci.txt > ${dir}/CAC_sugg_snps
+ 
+for file in `ls $dir | grep MVP`; do 
+echo $file; 
+cut -f1 ${file} | grep rs > ${file}_sugg_snps
+done
+
+
+for file in `ls $dir | grep UKBB`; do 
+echo $file; 
+cut -f13 ${file} | grep rs > ${file}_sugg_snps
+done
+
+
+for file in `ls $dir | grep sugg_snps`
+do echo $file
+echo ${file}>>list_sugg_snps
+done
+
+
+
+##plink 
+
+dir=/scratch/dw2vr/GREGOR_enrich_Final/GWAS_hg19
+dir2=/scratch/dw2vr/GREGOR_enrich_Final/gregor_in
+
+
+for trait in `cat $dir/list_sugg_snps`
+do 
+
+echo $trait 
+
+mkdir ${dir2}/${trait}
+
+for chr in {1..22} ; do 
+
+plink \
+--extract ${dir}/${trait} \
+--bfile /scratch/dw2vr/vcf_files/EUR_pop/plink_files/EUR_chr$chr \
+--indep-pairwise  50 5 0.2 \
+--out ${dir2}/${trait}/${trait}_chr${chr}_snps
+
+done 
+
+done 
+
+for trait in `cat $dir/list_sugg_snps`
+do 
+
+echo $trait 
+
+cat ${dir2}/${trait}/${trait}_chr*_snps.prune.in | grep rs > ${dir2}/${trait}_ALL_pruned_in
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.log
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.prune.out
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.nosex
+
+rm ${dir2}/${trait}/${trait}_chr*_snps.prune.in
+
+done 
+
+## running gregor
+beddir=/scratch/dw2vr/GREGOR_enrich_Final/bedfiles_hg19
+
+for file in `ls $beddir`; 
+
+do 
+
+echo $file
+
+echo '/scratch/dw2vr/GREGOR_enrich_Final/bedfiles_hg19/'${file} >> /scratch/dw2vr/GREGOR_enrich_Final/bed_list
+
+done 
+
+
+
+
+for trait in `cat $dir2/traits`
+do 
+echo $trait 
+dir3=/scratch/dw2vr/GREGOR_enrich_Final/gregor_out
+mkdir ${dir3}/${trait}
+
+
+echo 'INDEX_SNP_FILE =' ${dir}/${trait}_sugg_snps > ${dir3}/${trait}/gregor_file
+echo -e 'BED_FILE_INDEX = /scratch/dw2vr/GREGOR_enrich_Final/bed_list' >> ${dir3}/${trait}/gregor_file
+echo -e 'REF_DIR = /scratch/dw2vr/gregor_enrich/EUR_ref'>> ${dir3}/${trait}/gregor_file
+echo -e 'R2THRESHOLD = 0.8' >> ${dir3}/${trait}/gregor_file
+echo -e 'LDWINDOWSIZE = 1000000' >> ${dir3}/${trait}/gregor_file
+echo -e 'OUT_DIR =' ${dir3}/${trait} >> ${dir3}/${trait}/gregor_file
+echo -e 'MIN_NEIGHBOR_NUM = 500' >> ${dir3}/${trait}/gregor_file
+echo -e 'BEDFILE_IS_SORTED = false' >> ${dir3}/${trait}/gregor_file
+echo -e 'POPULATION = EUR' >> ${dir3}/${trait}/gregor_file 
+echo -e 'BATCHTYPE = local' >> ${dir3}/${trait}/gregor_file
+
+
+gregor_dir=/scratch/dw2vr/gregor_enrich/GREGOR/script
+
+
+perl $gregor_dir/GREGOR.pl --conf ${dir3}/${trait}/gregor_file
+
+
+done 
+
+
+
+for trait in `cat $dir2/traits`
+do 
+echo $trait 
+
+
+mkdir ${dir_3}/${trait}
+
+rm ${dir2}/gregor_file
+
+
+echo 'INDEX_SNP_FILE =' ${dir}/${trait} > ${dir2}/gregor_file
+echo -e 'BED_FILE_INDEX = /scratch/dw2vr/gregor_enrich/bedfiles' >> ${dir2}/gregor_file
+echo -e 'REF_DIR = /scratch/dw2vr/gregor_enrich/EUR_ref' >> ${dir2}/gregor_file
+echo -e 'R2THRESHOLD = 0.8' >> ${dir2}/gregor_file
+echo -e 'LDWINDOWSIZE = 1000000' >> ${dir2}/gregor_file
+echo -e 'OUT_DIR =' ${dir_3}/${trait} >> ${dir2}/gregor_file
+echo -e 'MIN_NEIGHBOR_NUM = 500' >> ${dir2}/gregor_file
+echo -e 'BEDFILE_IS_SORTED = false' >> ${dir2}/gregor_file
+echo -e 'POPULATION = EUR' >> ${dir2}/gregor_file 
+echo -e 'BATCHTYPE = local' >> ${dir2}/gregor_file
+
+
+gregor_dir=/scratch/dw2vr/gregor_enrich/GREGOR/script
+
+
+perl $gregor_dir/GREGOR.pl --conf ${dir2}/gregor_file
+
+
+done 
+
+
+

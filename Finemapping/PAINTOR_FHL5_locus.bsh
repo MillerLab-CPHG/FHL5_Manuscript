@@ -1,0 +1,92 @@
+PAINTOR_FHL5_locus.sbatch
+
+GWASFILE=FHL5_MI_EHJ_2021.txt
+
+sed -i -e "s/\r//g" $GWASFILE 
+
+#hm_variant_id	hm_rsid	hm_chrom	hm_pos	hm_other_allele	hm_effect_allele	hm_beta	hm_odds_ratio	hm_ci_lower	hm_ci_upper	hm_effect_allele_frequency	hm_code	variant_id	p_value	chromosome	base_pair_location	effect_allele	other_allele	effect_allele_frequency	odds_ratio	ci_lower	ci_upper	beta	standard_error
+
+tail -n+2 $GWASFILE | awk 'BEGIN{OFS=" "; print "CHR"" ""POS"" ""ZSCORE"}{print $15, $16,$23/$24}' >FHL5_locus
+
+## Calculating SNP Correlation, filters non-biallelic snps 
+
+tail -n+2 $GWASFILE | awk 'BEGIN{OFS=" "; print "chr"" ""pos"" ""rsid"" ""A0"" ""A1"" ""Zscore"}{print $15, $16, $13, $17,$18, $23/$24}' >FHL5_locus.MI
+
+ucsc_dir=/scratch/dw2vr/ucsc_tools
+
+tail -n+2 FHL5_locus.MI | awk '{print "chr"$1, $2, $2+1, $3}'  > FHL5_locus.MI.bed
+
+
+$ucsc_dir/liftOver FHL5_locus.MI.bed $ucsc_dir/hg38ToHg19.over.chain.gz FHL5_locus_hg19.MI.bed unMapped
+
+awk 'FNR==NR{a[$4]=$0}($3 in a){print a[$3], $0}' FHL5_locus_hg19.MI.bed FHL5_locus.MI | 
+awk 'BEGIN{OFS=" "; print "chr"" ""pos"" ""rsid"" ""A0"" ""A1"" ""Zscore"}{print $5, $2, $4, $9,$8,$10}' > FHL5_locus.hg19_MI
+
+
+python /scratch/dw2vr/PAINTOR_V3.0/PAINTOR_Utilities/CalcLD_1KG_VCF.py \
+--locus FHL5_locus.hg19_MI \
+--reference /scratch/dw2vr/ref_files/ALL.chr6.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz \
+--map /scratch/dw2vr/ref_files/integrated_call_samples_v3.20130502.ALL.panel \
+--effect_allele A1 \
+--alt_allele A0 \
+--population EUR \
+--Zhead Zscore \
+--out_name FHL5_locus \
+--position pos
+
+# note: need to liftover few snps remain after QC
+
+tail -n+2 FHL5_locus.processed | awk 'BEGIN{OFS=" "; print "CHR"" ""POS"" ""RSID"" ""ZSCORE"}{print 'chr'$1, $2, $3, $6}' - > FHL5_locus_hg19_processed 
+
+#overlapping annotations -- used scATAC-Pericyte/SMC peaks or human COR ATAC consensus peaks
+python /scratch/dw2vr/PAINTOR_V3.0/PAINTOR_Utilities/AnnotateLocus.py \
+--input artery_epigenomic_dat \
+--locus FHL5_locus_hg19_processed \
+--out FHL5_locus.annotations --chr CHR --pos POS
+
+mv FHL5_locus_hg19_processed FHL5_locus
+
+## 
+module load gcc 
+
+ /scratch/dw2vr/PAINTOR_V3.0/PAINTOR \
+-input input.files \
+-Zhead  ZSCORE \
+-LDname ld \
+-in /scratch/dw2vr/FHL5_locus_FM/2.28.22_paintor/ \
+-out /scratch/dw2vr/FHL5_locus_FM/2.28.22_paintor/outdir_scATAC_pericyte_SMC/ \
+-max_causal 1 \
+-enumerate 1 \
+-annotations scATAC_SMC_pericyte_hg19_2.bed
+
+
+
+ /scratch/dw2vr/PAINTOR_V3.0/PAINTOR \
+-input input.files \
+-Zhead  ZSCORE \
+-LDname ld \
+-in /scratch/dw2vr/FHL5_locus_FM/2.28.22_paintor/ \
+-out /scratch/dw2vr/FHL5_locus_FM/2.28.22_paintor/outdir_COR_ATAC/ \
+-max_causal 1 \
+-enumerate 1 \
+-annotations COR_ATAC_consensus_hg19.bed
+
+
+
+
+## lift over 
+
+
+ucsc_dir=/scratch/dw2vr/ucsc_tools
+
+tail -n+2 scATAC_SMC_FHL5_locus.results | awk -vOFS="\t" '{print "chr"$1, $2, $2+1, $3, $5}'> scATAC_SMC_FHL5_locus.results_hg19.bed
+
+$ucsc_dir/liftOver COR_bulkATAC_MI_credibleset_hg19.bed $ucsc_dir/hg19ToHg38.over.chain.gz COR_bulkATAC_MI_credibleset_hg38.bed unMapped
+
+
+$ucsc_dir/liftOver ABC_hg19.bed $ucsc_dir/hg19ToHg38.over.chain.gz ABC_links_hg38.bed unMapped
+
+
+
+
+

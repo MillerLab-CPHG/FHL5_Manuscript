@@ -1,0 +1,50 @@
+
+## annotating UKBB summ stats w/ rsid 
+
+awk 'BEGIN{OFS="\t"} NR==FNR {a[$1]=$2;next} ($1 in a) {print $0, a[$1]}' 
+ukbb_gwas_variants_less.txt /scratch/dw2vr/UKBB_self_report_HTN.txt >
+UKBB_self_report_HTN_rsid_anno.txt
+
+
+#file=UKBB_parkinsons_disease.both_sexes.tsv.bgz
+
+ukbb_rsid_list=/scratch/dw2vr/ref_files/ukbb_gwas_variants_less.txt
+
+gunzip -c /scratch/dw2vr/GREGOR_enrich_Final/GWAS_hg19/ukbb_rsid_annotate/UKBB_parkinsons_disease.both_sexes.tsv.bgz | awk 'BEGIN{OFS="\t"} NR==FNR {a[$1]=$0;next} ($1 in a) {print $0, a[$1],a[$2]}' $ukbb_rsid_list  - > UKBB_parkinsons_disease_rsid_anno.txt
+
+
+awk 'BEGIN{OFS="\t"} NR==FNR {a[$1]=$0;next} ($1 in a) {print $0, a[$1],a[$2]}' ukbb_gwas_variants_less.txt /scratch/dw2vr/UKBB_self_report_HTN.txt  
+
+## formatting UKBB summstats 
+
+for file in `ls | grep UKBB`;  do 
+
+echo $file; 
+
+awk -vOFS="\t" '{split($1, a, ":"); print a[1], a[2], a[3], a[4],
+$2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14}' ${file} | awk -vOFS="\t" '{if ($1==6 && $2 > 96560124 && $2 < 97560125) print}' | sort -gk15 > ${file}_chrsplit 
+
+awk -vOFS="\t" '{print $16, $17, $15}' ${file}_chrsplit > ${file}_FHL5_locus
+
+cat header ${file}_FHL5_locus > /scratch/dw2vr/ref_files/GWAS_sumstats/FHL5_locus_rs9486719/${file}_FHL5_locus_head
+
+rm ${file}_chrsplit
+
+rm ${file}_FHL5_locus
+
+done 
+
+## formatting MVP summstats 
+
+
+for file in `ls | grep only_transethnic_12052018.txt`;  do 
+
+echo $file; 
+
+awk -vOFS="\t" '{if ($2==6 && $3 > 96560124 && $3 < 97560125) print $1, $12}'  $file | sort -gk2  > ${file}_FHL5_locus
+
+cat header ${file}_FHL5_locus > /scratch/dw2vr/ref_files/GWAS_sumstats/FHL5_locus_rs9486719/${file}_FHL5_locus_head
+
+rm ${file}_FHL5_locus
+
+done 

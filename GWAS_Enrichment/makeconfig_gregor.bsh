@@ -1,0 +1,40 @@
+beddir=/scratch/dw2vr/GREGOR_enrich_Final/bedfiles_hg19
+
+for file in `ls $beddir`; 
+
+do 
+
+echo $file
+
+echo '/scratch/dw2vr/GREGOR_enrich_Final/bedfiles_hg19/'${file} >> /scratch/dw2vr/GREGOR_enrich_Final/bed_list
+
+done 
+
+
+for trait in `cat $dir2/traits`
+do 
+echo $trait 
+dir3=/scratch/dw2vr/GREGOR_enrich_Final/gregor_out
+mkdir ${dir3}/${trait}
+
+## making config file
+
+echo 'INDEX_SNP_FILE =' ${dir}/${trait}_sugg_snps > ${dir3}/${trait}/gregor_file
+echo -e 'BED_FILE_INDEX = /scratch/dw2vr/GREGOR_enrich_Final/bed_list' >> ${dir3}/${trait}/gregor_file
+echo -e 'REF_DIR = /scratch/dw2vr/gregor_enrich/EUR_ref'>> ${dir3}/${trait}/gregor_file
+echo -e 'R2THRESHOLD = 0.8' >> ${dir3}/${trait}/gregor_file
+echo -e 'LDWINDOWSIZE = 1000000' >> ${dir3}/${trait}/gregor_file
+echo -e 'OUT_DIR =' ${dir3}/${trait} >> ${dir3}/${trait}/gregor_file
+echo -e 'MIN_NEIGHBOR_NUM = 500' >> ${dir3}/${trait}/gregor_file
+echo -e 'BEDFILE_IS_SORTED = false' >> ${dir3}/${trait}/gregor_file
+echo -e 'POPULATION = EUR' >> ${dir3}/${trait}/gregor_file 
+echo -e 'BATCHTYPE = local' >> ${dir3}/${trait}/gregor_file
+
+
+gregor_dir=/scratch/dw2vr/gregor_enrich/GREGOR/script
+
+
+perl $gregor_dir/GREGOR.pl --conf ${dir3}/${trait}/gregor_file
+
+
+done 

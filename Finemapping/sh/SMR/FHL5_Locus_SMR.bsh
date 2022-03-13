@@ -1,0 +1,91 @@
+!/bin/bash
+#SBATCH -t 04:00:00
+#SBATCH -p standard
+#SBATCH --mem=10000
+#SBATCH -J smr_star
+#SBATCH -A cphg-millerlab
+#SBATCH -o smr_star
+
+
+GWAS_DIR=/scratch/dw2vr/FHL5_locus_SMR_coloc/GWAS
+GWASFILE=FHL5_MI_EHJ_2021.txt
+
+EQTL_DIR=/scratch/dw2vr/FHL5_locus_SMR_coloc
+EQTLFILE=FHL5_locus_GTEx_AOR_eQTL.txt
+
+TSSFILE="/scratch/dw2vr/smr/genes_tss.hg19"
+MAF_ANNOTATION="/scratch/dw2vr/ref_files/hg19_20130502_af_0.01_2.txt"
+
+PATH=$PATH:/scratch/dw2vr/smr
+export PATH 
+
+echo "Formatting GWAS data for SMR" 
+#Annotating maf using 1000G EUR ref panel maf > 0.01 
+
+#If N is not known, use NA, it's not used in SMR
+#annotating EA freq 
+tail -n+2 $GWAS_DIR/$GWASFILE | 
+awk 'BEGIN{OFS="\t"; print "SNP","A1","A2","freq","b","se","p","n"} {print $2,$17,$18,$19,$23,$24,$14, "NA"}' > $GWAS_DIR/chr6_MI_EHJ_formatted_for_SMR.txt 
+
+sed -i -e "s/\r//g" $GWAS_DIR/chr6_MI_EHJ_formatted_for_SMR.txt
+
+echo "formatting eQTL data to make SMR input besd files " 
+#removed ","" from EA/NEA column and AF=0 SNPs and "chr" from chromosome#
+#chr bp, EA, NEA gene_id	variant_id	tss_distance	ma_samples	ma_count	maf	pval_nominal	slope	slope_se
+
+cut -f1 $EQTL_DIR/$EQTLFILE | sort -u > $EQTL_DIR/${EQTLFILE}_chr${i}_uniquegenes
+
+awk -vOFS="\t" '{split($2, a, "_"); print substr(a[1],4),a[2],a[3],a[4], $0}' $EQTL_DIR/FHL5_locus_GTEx_AOR_eQTL.txt | 
+awk -vOFS="\t" '{print $1, $14,$2,$4,$3,$10,$12,$13,$11,$5 }' > $EQTL_DIR/chr${i}_anno_${EQTLFILE}
+
+
+mkdir ${EQTL_DIR}/GTEx_AOR_esdfiles
+DIR2=${EQTL_DIR}/GTEx_AOR_esdfiles
+
+echo -e 'Chr''\t''gene''\t''GeneticDistance''\t''tss''\t''gene''\t''direction''\t''path' > $EQTL_DIR/chr${i}_${EQTLFILE}_flist
+
+
+echo "Formatting data for:"
+while read gene; do
+	echo $gene
+	grep $gene $EQTL_DIR/chr${i}_anno_${EQTLFILE} > $DIR2/chr${i}_current_gene_raw_data_rsid_maf.txt
+	awk -vOFS="\t" 'BEGIN{print "Chr","SNP","Bp","A1","A2","Freq","Beta","se","p"}{print$1,$2,$3,$4,$5,$6,$7,$8,$9}' $DIR2/chr${i}_current_gene_raw_data_rsid_maf.txt > ${gene}.esd
+	mv ${gene}.esd $DIR2
+	
+	# add information to flist file
+	genesearch=`echo $gene | awk '{split($0,a,"."); print a[1]}'`
+	chr=`grep $genesearch $TSSFILE | head -n1 | awk '{print $2}'`
+	direction=`grep $genesearch $TSSFILE | head -n1 | awk '{print $3}'`
+	tss=`grep $genesearch $TSSFILE | head -n1 | awk '{print $4}'`
+	path=`echo $DIR2/"$gene.esd"`
+	echo -e $chr'\t'$genesearch'\t'0'\t'$tss'\t'$gene'\t'$direction'\t'$path >> $EQTL_DIR/chr${i}_${EQTLFILE}_flist
+
+done < $EQTL_DIR/${EQTLFILE}_chr${i}_uniquegenes
+
+## create SMR binary data
+# this creates the binary files in the format SMR uses (.besd)
+# Need to download SMR and provide it the flist file created using the script above
+smr --eqtl-flist $EQTL_DIR/chr${i}_${EQTLFILE}_flist --make-besd --out $DIR2/chr${i}_GTEx_AOR
+
+## run SMR
+# 1000G refers to PLINK binary files .bed, .bim, .fam (of any population used as a reference for LD, 1000G is one example)
+smr --bfile /nv/vol185/pubdata/SNP/1000genomes/20130502/1KG.chr${i} \
+--gwas-summary $GWAS_DIR/chr6_MI_EHJ_formatted_for_SMR.txt \
+--beqtl-summary $DIR2/chr${i}_GTEx_AOR \
+--out $GWAS_DIR/chr${i}_MI_EHJ --thread-num 10 --peqtl-smr 5E-3 --diff-freq-prop 1 
+
+## Putting data together 
+
+for file in `ls chr*GTEx*.smr`; do awk '{print FILENAME, $0}' $file >  ${file}_tmp.txt ; done
+
+cat chr6_*_AOR.smr_tmp.txt | grep ENSG | cat smr_out_header - > FHL5_locus_AOR_smr_out.txt 
+
+cat chr6_*_COR.smr_tmp.txt | grep ENSG | cat smr_out_header - > FHL5_locus_COR_smr_out.txt 
+
+cat chr6_*_TIB.smr_tmp.txt | grep ENSG | cat smr_out_header - > FHL5_locus_TIB_smr_out.txt 
+
+
+
+
+
+
